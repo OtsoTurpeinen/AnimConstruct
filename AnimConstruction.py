@@ -2,7 +2,7 @@ bl_info = {
     "name": "Animate Construction",
     "description": "Tools to help creating construction animations. ",
     "author": "Otso Turpeinen",
-    "version": (1, 0, 0),
+    "version": (1, 2, 0),
     "blender": (2, 79, 0),
     "location": "3D View > Tools",
     "warning": "", # used for warning icon and text in addons panel
