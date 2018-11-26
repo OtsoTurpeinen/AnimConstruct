@@ -6,7 +6,6 @@ Generate animation for all selected objects.
 - Translation
 - Euler Rotation
 - Scale
-Overlap animations
 - Set frame count per object
 - Set overlap between object animations (currently cannot be greater or equal to frame count)
 
