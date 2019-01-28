@@ -2,7 +2,7 @@ bl_info = {
     "name": "Animate Construction",
     "description": "Tools to help creating construction animations. ",
     "author": "Otso Turpeinen",
-    "version": (1, 2, 0),
+    "version": (1, 0, 0),
     "blender": (2, 79, 0),
     "location": "3D View > Tools",
     "warning": "", # used for warning icon and text in addons panel
@@ -25,8 +25,8 @@ class AnimCon_Properties(bpy.types.PropertyGroup):
     m_KeyfamePer = bpy.props.IntProperty(name="Keyframes", description="Keyframes per object", default=1, min=1, max=9999, soft_min=1, soft_max=9999, step=1)
     m_KeyOverlap = bpy.props.IntProperty(name="Overlap", description="Animation overlap between different objects.", default=0, min=-9999, max=9999, soft_min=-9999, soft_max=9999, step=1)
 
-   # m_AfterTranslate = bpy.props.FloatVectorProperty(name="Move out Translate", description="Animation Translation", default=(20.0, 0.0, 0.0), step=3, precision=2, unit='LENGTH', size=3)
-   # m_AfterKeyfame = bpy.props.IntProperty(name="Move out Keyframes", description="Keyframes for move out", default=0, min=0, max=9999, soft_min=0, soft_max=9999, step=1)
+    m_AfterTranslate = bpy.props.FloatVectorProperty(name="Move out Translate", description="Animation Translation", default=(20.0, 0.0, 0.0), step=3, precision=2, unit='LENGTH', size=3)
+    m_AfterKeyfame = bpy.props.IntProperty(name="Move out Keyframes", description="Keyframes for move out", default=0, min=0, max=9999, soft_min=0, soft_max=9999, step=1)
 
 #Properties for origin offset tool. 
 class AnimConHelp_Properties(bpy.types.PropertyGroup):
@@ -83,12 +83,13 @@ class AnimCon_Operator(bpy.types.Operator):
         #Calculating length of the whole animation.
         end_frame = scn.frame_current+(len(sorted_select)+1)*(mytool.m_KeyfamePer-mytool.m_KeyOverlap)+mytool.m_KeyfamePer
         #I don't want to change the end_frame if this is not the last animation to finish.
-        if (scn.frame_end < end_frame+1):
-            scn.frame_end = end_frame+1
+        if (scn.frame_end < end_frame+1+mytool.m_AfterKeyfame):
+            scn.frame_end = end_frame+1+mytool.m_AfterKeyfame
         self.setselect(sorted_select,False)
         #decided to pass on the whole tool because there are so many parameters.
         self.opsGenerateAnimation(sorted_select,scn.frame_current,end_frame,mytool)
         self.setselect(sorted_select,True)
+        scn.frame_current = end_frame+1
         return {'FINISHED'}
 
     #Sorting by vector. 
@@ -106,13 +107,14 @@ class AnimCon_Operator(bpy.types.Operator):
         n = 1
         alpo = tool.m_KeyfamePer
         ao = tool.m_KeyOverlap
-        #outkey = tool.m_AfterKeyfame
+        outkey = tool.m_AfterKeyfame
+        outvec = tool.m_AfterTranslate
         vec = tool.m_Translate
         rot = tool.m_Rotation
         scl = tool.m_Scale
         btra = (abs(vec[0]) > 0.00000 or abs(vec[1]) > 0.00000 or abs(vec[2]) > 0.00000)
         brot = (abs(rot[0]) > 0.00000 or abs(rot[1]) > 0.00000 or abs(rot[2]) > 0.00000)
-        bscl = (abs(scl[0]) > 0.00000 or abs(scl[1]) > 0.00000 or abs(scl[2]) > 0.00000)
+        bscl = (abs(scl[0]-1.00000) > 0.00000 or abs(scl[1]-1.00000) > 0.00000 or abs(scl[2]-1.00000) > 0.00000)
         for obj in ls:
             #we need to select the object to use the translate & keyframe ops.
             bpy.context.scene.objects.active = obj
@@ -121,8 +123,8 @@ class AnimCon_Operator(bpy.types.Operator):
             #make sure we are in object mode
             ovec = (vec[0]*-1,vec[1]*-1,vec[2]*-1)
             orot = (rot[0]*-1,rot[1]*-1,rot[2]*-1)
-            oscl = (scl[0]*-1,scl[1]*-1,scl[2]*-1)
-            #oscl = (obj.scale.x,obj.scale.y,obj.scale.z)
+            #oscl = (scl[0]*-1,scl[1]*-1,scl[2]*-1)
+            oscl = (obj.scale.x,obj.scale.y,obj.scale.z)
             bpy.ops.object.mode_set(mode = 'OBJECT')
 
             #do start frames
@@ -139,9 +141,9 @@ class AnimCon_Operator(bpy.types.Operator):
                 obj.rotation_euler.z += rot[2]
                 obj.keyframe_insert(data_path='rotation_euler', frame=correct_frame)
             if (bscl):
-                obj.scale.x += scl[0]
-                obj.scale.y += scl[1]
-                obj.scale.z += scl[2]
+                obj.scale.x = scl[0]
+                obj.scale.y = scl[1]
+                obj.scale.z = scl[2]
                 obj.keyframe_insert(data_path='scale', frame=correct_frame)
             #bpy.ops.transform.translate(value=vec)
             #bpy.ops.anim.keyframe_insert_menu(type='Location')
@@ -179,8 +181,11 @@ class AnimCon_Operator(bpy.types.Operator):
             #bpy.ops.anim.keyframe_insert_menu(type='Location')
 
             #do end out frame
-            #if (outkey > 0):
-            #    bpy.context.scene.frame_set(end_frame+1+outkey)
+            if (outkey > 0):
+                obj.location.x += outvec[0]
+                obj.location.y += outvec[1]
+                obj.location.z += outvec[2]
+                obj.keyframe_insert(data_path='location', frame=end_frame+1+outkey)
             #    bpy.ops.transform.translate(value=outvec)
             #    bpy.ops.anim.keyframe_insert_menu(type='Location')
             #Deselect and count up
@@ -213,8 +218,8 @@ class AnimCon_Panel(bpy.types.Panel):
         ncol.prop(mytool, "m_Rotation")
         ncol.prop(mytool, "m_KeyfamePer")
         ncol.prop(mytool, "m_KeyOverlap")
-        #ncol.prop(mytool, "m_AfterTranslate")
-        #ncol.prop(mytool, "m_AfterKeyfame")
+        ncol.prop(mytool, "m_AfterTranslate")
+        ncol.prop(mytool, "m_AfterKeyfame")
         layout.operator(AnimCon_Operator.bl_idname,text="Generate Animation")
 
 class AnimConOffset_Panel(bpy.types.Panel):
